@@ -17,13 +17,13 @@ Current version of the library requires a latest stable Go release. If you don't
 Use go tool to install the package in your packages tree:
 
 ```
-go get github.com/Synthace/goflow
+go get github.com/igonow/flow
 ```
 
 Then you can use it in import section of your Go programs:
 
 ```go
-import "github.com/Synthace/goflow"
+import "github.com/igonow/flow"
 ```
 
 ## Basic Example
@@ -39,7 +39,7 @@ package main
 
 import (
 	"fmt"
-	"github.com/Synthace/goflow"
+	"github.com/igonow/flow"
 )
 
 // A component that generates greetings
