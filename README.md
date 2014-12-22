@@ -17,13 +17,13 @@ Current version of the library requires a latest stable Go release. If you don't
 Use go tool to install the package in your packages tree:
 
 ```
-go get github.com/igonow/flow
+go get github.com/gogap/flow
 ```
 
 Then you can use it in import section of your Go programs:
 
 ```go
-import "github.com/igonow/flow"
+import "github.com/gogap/flow"
 ```
 
 ## Basic Example
