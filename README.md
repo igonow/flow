@@ -38,70 +38,79 @@ This first one generates greetings for given names, the second one prints them o
 package main
 
 import (
-	"fmt"
-	"github.com/igonow/flow"
+	"net/http"
+	"time"
+
+	"github.com/gogap/flow"
 )
 
-// A component that generates greetings
+//APP,必须组合Graph
+type GreetingApp struct {
+	flow.Graph
+}
+
+//与外部世界交互的入口
 type Greeter struct {
-	flow.Component               // component "superclass" embedded
-	Name           <-chan string // input port
-	Res            chan<- string // output port
+	flow.Component                 // 必须组合component
+	Ipt            <-chan Message1 `flow:"input"`
+	Opt            chan<- Message2 `flow:"sender"`
 }
 
-// Reaction to a new name input
-func (g *Greeter) OnName(name string) {
-	greeting := fmt.Sprintf("Hello, %s!", name)
-	// send the greeting to the output port
-	g.Res <- greeting
+//接受数据并转发到Printer
+func (g *Greeter) OnIpt(ipt Message1) {
+	var ipt2 Message2
+	ipt2.Output = ipt.Output //返回channel逐级向下传递
+	ipt2.Time = ipt.Time
+	g.Opt <- ipt2
 }
 
-// A component that prints its input on screen
+//返回数据到外部世界
 type Printer struct {
 	flow.Component
-	Line <-chan string // inport
+	Ipt <-chan Message2 `flow:"receiver"`
 }
 
-// Prints a line when it gets it
-func (p *Printer) OnLine(line string) {
-	fmt.Println(line)
+//返回到Output
+func (p *Printer) OnIpt(ipt2 Message2) {
+	ipt2.Output <- ipt2.Time
 }
 
-// Our greeting network
-type GreetingApp struct {
-	flow.Graph               // graph "superclass" embedded
+//传递的消息之一，必须组合Context
+type Message1 struct {
+	flow.Context
+	Time string
 }
 
-// Graph constructor and structure definition
-func NewGreetingApp() *GreetingApp {
-	n := new(GreetingApp) // creates the object in heap
-	n.InitGraphState()    // allocates memory for the graph
-	// Add processes to the network
-	n.Add(new(Greeter), "greeter")
-	n.Add(new(Printer), "printer")
-	// Connect them with a channel
-	n.Connect("greeter", "Res", "printer", "Line")
-	// Our net has 1 inport mapped to greeter.Name
-	n.MapInPort("In", "greeter", "Name")
-	return n
+//传递的消息之二，必须组合Context
+type Message2 struct {
+	flow.Context
+	Time string
 }
 
 func main() {
-	// Create the network
-	net := NewGreetingApp()
-	// We need a channel to talk to it
-	in := make(chan string)
-	net.SetInPort("In", in)
-	// Run the net
-	flow.RunNet(net)
-	// Now we can send some names and see what happens
-	in <- "John"
-	in <- "Boris"
-	in <- "Hanna"
-	// Close the input to shut the network down
-	close(in)
-	// Wait until the app has done its job
-	<-net.Wait()
+	net := flow.NewNet()                    //新建网络
+	net.Add(new(Greeter), new(Printer))     //增加组件
+	net.Connect(new(Greeter), new(Printer)) //连接组件（发送方、接收方）
+	net.Run()
+
+	in := make(chan Message1)       //初始化对象
+	net.SetInPort(new(Greeter), in) //映射到网络入口
+
+	var f = func(writer http.ResponseWriter, req *http.Request) {
+		ipt := Message1{Time: time.Now().String()}
+		ipt.Context.Init()  //必须初始化channel，否则阻塞且不报错！
+		in <- ipt           //数据进入网络
+		opt := <-ipt.Output //网络返回数据
+		if ipt.Time != opt.(string) {
+			panic("mix channel")
+		}
+	}
+
+	http.HandleFunc("/", f)
+	err := http.ListenAndServe(":8000", nil) //模拟完整的web server
+	if err != nil {
+		panic(err)
+	}
 }
 ```
 
